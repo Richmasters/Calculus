@@ -1,0 +1,13 @@
+{
+  "name": "painterly-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Turn photo files into paintings — stroke-based painterly rendering with deep adjustments and presets. Runs entirely in the browser.",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "smoke": "node scripts/smoke-test.mjs"
+  },
+  "engines": { "node": ">=18" }
+}

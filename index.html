@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Painterly Studio — turn photos into paintings</title>
+  <meta name="description" content="Turn photo files into paintings in the browser: stroke-based painterly rendering with deep adjustments and presets." />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>🎨</text></svg>" />
+  <link rel="stylesheet" href="./src/styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">🎨</span>
+      <div>
+        <h1>Painterly Studio</h1>
+        <p>Photos in, paintings out. Everything runs locally in your browser.</p>
+      </div>
+    </div>
+
+    <div class="topbar-actions">
+      <label class="field compact">
+        <span>Preview</span>
+        <select id="previewQuality">
+          <option value="640">Fast</option>
+          <option value="1000" selected>Balanced</option>
+          <option value="1500">High</option>
+          <option value="2200">Maximum</option>
+        </select>
+      </label>
+      <button id="openBtn" class="btn">Open photos…</button>
+      <button id="exportBtn" class="btn primary" disabled>Export painting</button>
+      <input id="fileInput" type="file" accept="image/*" multiple hidden />
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Presets -->
+    <aside class="panel presets" aria-label="Presets">
+      <div class="panel-head">
+        <h2>Presets</h2>
+        <button id="randomBtn" class="btn ghost small" title="Nudge every setting at random">Surprise me</button>
+      </div>
+      <div id="presetList" class="preset-list"></div>
+
+      <div class="panel-head">
+        <h2>Your presets</h2>
+        <button id="savePresetBtn" class="btn ghost small">Save current…</button>
+      </div>
+      <div id="customPresetList" class="preset-list custom"></div>
+
+      <div class="panel-foot">
+        <button id="resetBtn" class="btn ghost small">Reset all settings</button>
+        <button id="exportSettingsBtn" class="btn ghost small">Export settings</button>
+        <button id="importSettingsBtn" class="btn ghost small">Import settings</button>
+        <input id="settingsInput" type="file" accept="application/json,.json" hidden />
+      </div>
+    </aside>
+
+    <!-- Canvas -->
+    <section class="stage" id="stage">
+      <div class="stage-toolbar">
+        <div class="tool-group">
+          <button id="fitBtn" class="btn ghost small">Fit</button>
+          <button id="zoom100Btn" class="btn ghost small">100%</button>
+          <span id="zoomLabel" class="readout">100%</span>
+        </div>
+        <div class="tool-group">
+          <label class="switch">
+            <input type="checkbox" id="compareToggle" />
+            <span>Compare with original</span>
+          </label>
+          <button id="holdOriginalBtn" class="btn ghost small" title="Press and hold to view the untouched photo">Hold for original</button>
+        </div>
+        <div class="tool-group">
+          <span id="imageMeta" class="readout"></span>
+        </div>
+      </div>
+
+      <div class="viewport" id="viewport">
+        <canvas id="view"></canvas>
+        <div class="dropzone" id="dropzone">
+          <div class="dropzone-inner">
+            <span class="dropzone-icon" aria-hidden="true">🖼️</span>
+            <h2>Drop photos here</h2>
+            <p>or <button class="link" id="browseBtn">browse your files</button> — you can also paste from the clipboard.</p>
+            <button class="btn subtle" id="sampleBtn">Load a demo image instead</button>
+            <p class="fineprint">Nothing is uploaded. Your pictures never leave this device.</p>
+          </div>
+        </div>
+        <div class="progress" id="progress" hidden>
+          <div class="progress-bar"><i id="progressFill"></i></div>
+          <span id="progressLabel">Painting…</span>
+        </div>
+      </div>
+
+      <div class="filmstrip" id="filmstrip" hidden></div>
+    </section>
+
+    <!-- Controls -->
+    <aside class="panel controls" aria-label="Adjustments">
+      <div class="panel-head">
+        <h2>Adjustments</h2>
+        <input id="paramSearch" class="search" type="search" placeholder="Filter settings…" />
+      </div>
+      <div id="controlGroups" class="control-groups"></div>
+      <div class="panel-foot column">
+        <label class="field">
+          <span>Random seed <em id="seedValue">1</em></span>
+          <div class="row">
+            <input id="seedRange" type="range" min="1" max="999" step="1" value="1" />
+            <button id="rerollBtn" class="btn ghost small">Reroll</button>
+          </div>
+        </label>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Export dialog -->
+  <dialog id="exportDialog" class="dialog">
+    <form method="dialog">
+      <h2>Export painting</h2>
+      <p class="dialog-note">The painting is re-rendered at full size, so brushwork stays proportional.</p>
+      <label class="field">
+        <span>Size</span>
+        <select id="exportScale">
+          <option value="1">Original resolution</option>
+          <option value="0.5">Half size</option>
+          <option value="1.5">1.5×</option>
+          <option value="2">2× (slow)</option>
+        </select>
+      </label>
+      <label class="field">
+        <span>Format</span>
+        <select id="exportFormat">
+          <option value="image/png">PNG (lossless)</option>
+          <option value="image/jpeg">JPEG</option>
+          <option value="image/webp">WebP</option>
+        </select>
+      </label>
+      <label class="field" id="qualityField">
+        <span>Quality <em id="qualityValue">92</em></span>
+        <input id="exportQuality" type="range" min="50" max="100" step="1" value="92" />
+      </label>
+      <label class="switch">
+        <input type="checkbox" id="exportAll" />
+        <span>Export every loaded photo</span>
+      </label>
+      <div class="dialog-actions">
+        <button value="cancel" class="btn ghost">Cancel</button>
+        <button value="ok" id="exportConfirm" class="btn primary">Render &amp; download</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
