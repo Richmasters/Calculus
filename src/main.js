@@ -4,6 +4,7 @@ import { PRESETS, PRESET_CATEGORIES, findPreset } from './presets.js';
 import { ControlPanel } from './ui/controls.js';
 import { Viewer } from './ui/viewer.js';
 import { resizeToCanvas } from './util/canvas.js';
+import { saveBlob, canvasToBlob } from './util/save.js';
 import { makeSampleImage } from './sample.js';
 
 const $ = (id) => document.getElementById(id);
@@ -338,13 +339,20 @@ async function doExport() {
           setProgress(`${label} (${i + 1}/${targets.length})`, value)
       });
 
-      await downloadCanvas(result.canvas, fileNameFor(img, format), format, quality);
+      const blob = await canvasToBlob(result.canvas, format, quality);
+      await saveBlob(blob, fileNameFor(img, format));
       exportPainter.invalidate();
     }
     toast(targets.length > 1 ? `Exported ${targets.length} paintings` : 'Painting saved');
   } catch (err) {
-    console.error(err);
-    toast('Export failed');
+    if (err?.code === 'declined') {
+      toast('Export cancelled');
+    } else if (err?.code === 'unavailable') {
+      toast('Saving files is not available here — run the app locally to export');
+    } else {
+      console.error(err);
+      toast('Export failed');
+    }
   } finally {
     showProgress(false);
     el.exportBtn.disabled = false;
@@ -356,21 +364,6 @@ function fileNameFor(img, format) {
   const base = img.name.replace(/\.[^.]+$/, '') || 'painting';
   const style = state.presetId || 'custom';
   return `${base}-${style}.${ext}`;
-}
-
-function downloadCanvas(canvas, filename, format, quality) {
-  return new Promise((resolve) => {
-    canvas.toBlob((blob) => {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.append(a);
-      a.click();
-      a.remove();
-      setTimeout(() => { URL.revokeObjectURL(url); resolve(); }, 400);
-    }, format, quality);
-  });
 }
 
 /* ------------------------------------------------------------------ *
@@ -528,15 +521,14 @@ el.resetBtn.addEventListener('click', () => {
 });
 el.savePresetBtn.addEventListener('click', saveCurrentPreset);
 
-el.exportSettingsBtn.addEventListener('click', () => {
+el.exportSettingsBtn.addEventListener('click', async () => {
   const blob = new Blob([JSON.stringify({ version: 1, params: state.params }, null, 2)],
     { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'painterly-settings.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 400);
+  try {
+    await saveBlob(blob, 'painterly-settings.json');
+  } catch (err) {
+    toast(err?.code === 'declined' ? 'Export cancelled' : 'Could not save the settings file');
+  }
 });
 el.importSettingsBtn.addEventListener('click', () => el.settingsInput.click());
 el.settingsInput.addEventListener('change', async () => {
